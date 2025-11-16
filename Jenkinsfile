@@ -7,35 +7,30 @@ pipeline {
     }
 
     stages {
-        stage('Build Docker Image') {
+        stage('Build & Deploy on EC2') {
             steps {
-                sh "docker build -t $DOCKERHUB_USER/$DOCKERHUB_IMAGE:latest ."
-            }
-        }
-
-        stage('Login to DockerHub') {
-            steps {
-                withCredentials([string(credentialsId: 'dockerhub-pass', variable: 'DOCKERHUB_PASS')]) {
-                    sh "echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USER --password-stdin"
-                }
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                sh "docker push $DOCKERHUB_USER/$DOCKERHUB_IMAGE:latest"
-            }
-        }
-
-        stage('Deploy on EC2') {
-            steps {
+                // Use your SSH credentials configured in Jenkins
                 sshagent(['ec2-ssh-key']) {
                     sh """
                     ssh -o StrictHostKeyChecking=no ubuntu@3.110.207.227 '
-                        docker stop cicd-demo || true
-                        docker rm cicd-demo || true
-                        docker pull $DOCKERHUB_USER/$DOCKERHUB_IMAGE:latest
-                        docker run -d --name cicd-demo -p 3000:3000 $DOCKERHUB_USER/$DOCKERHUB_IMAGE:latest
+                        # Clone the repo or pull latest changes
+                        if [ ! -d /tmp/ci-cd ]; then
+                            git clone -b main https://github.com/Ayyappa-07/ci-cd.git /tmp/ci-cd
+                        else
+                            cd /tmp/ci-cd
+                            git reset --hard
+                            git pull
+                        fi
+
+                        # Build Docker image
+                        docker build -t $DOCKERHUB_USER/$DOCKERHUB_IMAGE:latest /tmp/ci-cd
+
+                        # Stop and remove old container if exists
+                        docker stop $DOCKERHUB_IMAGE || true
+                        docker rm $DOCKERHUB_IMAGE || true
+
+                        # Run new container
+                        docker run -d --name $DOCKERHUB_IMAGE -p 3000:3000 $DOCKERHUB_USER/$DOCKERHUB_IMAGE:latest
                     '
                     """
                 }
@@ -43,3 +38,4 @@ pipeline {
         }
     }
 }
+g
