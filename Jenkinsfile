@@ -7,12 +7,6 @@ pipeline {
     }
 
     stages {
-        stage('Clone Repo') {
-            steps {
-                git 'https://github.com/Ayyappa-07/ci-cd.git'
-            }
-        }
-
         stage('Build Docker Image') {
             steps {
                 sh "docker build -t $DOCKERHUB_USER/$DOCKERHUB_IMAGE:latest ."
